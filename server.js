@@ -21,8 +21,8 @@ app.post('/register', async (req, res) => {
   const userId = `user_${Date.now()}`;
 
   try {
-    const baseUrl = 'http://localhost:3000/action'; // URL for the action page
-    const qrUrl = `${baseUrl}?userId=${userId}`;
+    const baseUrl = process.env.BASE_URL; // URL for the action page
+    const qrUrl = `${baseUrl}action?userId=${userId}`;
     const qrCodeDataUrl = await QRCode.toDataURL(qrUrl);
 
     await knex('users').insert({ userId, name, phoneNumber, carPlateNumber, carType, password, qrCodeUrl: qrCodeDataUrl });
@@ -36,9 +36,9 @@ app.post('/register', async (req, res) => {
 
 app.post('/generate-qr', async (req, res) => {
   const { userId } = req.body;
-  const baseUrl = 'http://localhost:3000/action'; // URL for the action page
+  const baseUrl = process.env.BASE_URL; // URL for the action page
 
-  const qrUrl = `${baseUrl}?userId=${userId}`;
+  const qrUrl = `${baseUrl}action?userId=${userId}`;
 
   try {
     const qrCodeDataUrl = await QRCode.toDataURL(qrUrl);
@@ -51,13 +51,19 @@ app.post('/generate-qr', async (req, res) => {
 
 app.get('/send-sms', async (req, res) => {
   const { userId } = req.query;
-  const userPhoneNumber = '+60176374665'; // Replace with actual phone number
-  const message = 'This is a test SMS message';
 
   try {
+    const user = await knex('users').where({ userId }).first();
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const userPhoneNumber = user.phoneNumber; 
+    const message = 'This is a test SMS message';
+
     await client.messages.create({
       body: message,
-      from: '+16189958169', // Replace with your Twilio phone number
+      from: process.env.TWILIO_PHONE_NUMBER, 
       to: userPhoneNumber
     });
     res.send('SMS sent successfully');
@@ -69,13 +75,19 @@ app.get('/send-sms', async (req, res) => {
 
 app.get('/send-whatsapp', async (req, res) => {
   const { userId } = req.query;
-  const userPhoneNumber = '+60176374665'; // Replace with actual phone number
-  const message = 'This is a test WhatsApp message';
 
   try {
+    const user = await knex('users').where({ userId }).first();
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const userPhoneNumber = user.phoneNumber;
+    const message = 'This is a test WhatsApp message';
+
     await client.messages.create({
       body: message,
-      from: 'whatsapp:+16189958169', // Replace with your Twilio WhatsApp number
+      from: `whatsapp:${process.env.TWILIO_PHONE_NUMBER}`,
       to: `whatsapp:${userPhoneNumber}`
     });
     res.send('WhatsApp message sent successfully');
@@ -87,13 +99,19 @@ app.get('/send-whatsapp', async (req, res) => {
 
 app.get('/send-voice-note', async (req, res) => {
   const { userId } = req.query;
-  const userPhoneNumber = '+60176374665'; // Replace with actual phone number
 
   try {
+    const user = await knex('users').where({ userId }).first();
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const userPhoneNumber = user.phoneNumber;
+
     await client.calls.create({
       twiml: `<Response><Say>Hello, this is a test voice message</Say></Response>`,
       to: userPhoneNumber,
-      from: '+16189958169' // Replace with your Twilio phone number
+      from: process.env.TWILIO_PHONE_NUMBER
     });
     res.send('Voice note sent successfully');
   } catch (error) {
